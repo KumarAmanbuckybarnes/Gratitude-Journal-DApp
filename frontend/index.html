@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gratitude Journal</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.6.1/web3.min.js"></script>
+  </head>
+  <body>
+    <h1>Gratitude Journal</h1>
+
+    <div id="account-info">
+      <button onclick="connectWallet()">Connect Wallet</button>
+      <p id="user-account">Not connected</p>
+    </div>
+
+    <div id="record-gratitude">
+      <textarea
+        id="gratitude-entry"
+        placeholder="What are you grateful for?"
+        rows="4"
+        cols="50"
+      ></textarea
+      ><br />
+      <button onclick="recordGratitude()">Record Gratitude</button>
+    </div>
+
+    <div id="view-entries">
+      <h2>Your Gratitude Entries</h2>
+      <button onclick="getEntries()">Get My Entries</button>
+      <ul id="entries-list"></ul>
+    </div>
+
+    <script>
+      let web3;
+      let contract;
+      let userAccount;
+      const contractAddress = "0x3A14D549C4eE8A9628A713e50D2311AA89cC5B46"; // Replace with your deployed contract address
+      const contractABI = [
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "author",
+              type: "address",
+            },
+            {
+              indexed: false,
+              internalType: "string",
+              name: "entry",
+              type: "string",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "timestamp",
+              type: "uint256",
+            },
+          ],
+          name: "GratitudeRecorded",
+          type: "event",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "entries",
+          outputs: [
+            {
+              internalType: "address",
+              name: "author",
+              type: "address",
+            },
+            {
+              internalType: "string",
+              name: "entry",
+              type: "string",
+            },
+            {
+              internalType: "uint256",
+              name: "timestamp",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_author",
+              type: "address",
+            },
+          ],
+          name: "getEntriesByAuthor",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "author",
+                  type: "address",
+                },
+                {
+                  internalType: "string",
+                  name: "entry",
+                  type: "string",
+                },
+                {
+                  internalType: "uint256",
+                  name: "timestamp",
+                  type: "uint256",
+                },
+              ],
+              internalType: "struct GratitudeJournal.GratitudeEntry[]",
+              name: "",
+              type: "tuple[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "string",
+              name: "_entry",
+              type: "string",
+            },
+          ],
+          name: "recordGratitude",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ];
+
+      // Connect to the user's Ethereum wallet
+      async function connectWallet() {
+        if (window.ethereum) {
+          web3 = new Web3(window.ethereum);
+          try {
+            await window.ethereum.enable(); // Request wallet connection
+            userAccount = await web3.eth.getAccounts();
+            document.getElementById(
+              "user-account"
+            ).innerText = `Connected: ${userAccount[0]}`;
+            contract = new web3.eth.Contract(contractABI, contractAddress);
+          } catch (error) {
+            console.error("User denied account access");
+          }
+        } else {
+          alert("Please install MetaMask to use this feature");
+        }
+      }
+
+      // Record a new gratitude entry
+      async function recordGratitude() {
+        const gratitudeEntry = document.getElementById("gratitude-entry").value;
+        if (!gratitudeEntry) {
+          alert("Gratitude entry cannot be empty");
+          return;
+        }
+        try {
+          await contract.methods
+            .recordGratitude(gratitudeEntry)
+            .send({ from: userAccount[0] });
+          alert("Gratitude recorded!");
+          document.getElementById("gratitude-entry").value = ""; // Clear the input field
+        } catch (error) {
+          console.error(error);
+          alert("Error recording gratitude");
+        }
+      }
+
+      // Get all gratitude entries for the connected address
+      async function getEntries() {
+        try {
+          const entries = await contract.methods
+            .getEntriesByAuthor(userAccount[0])
+            .call();
+          const entriesList = document.getElementById("entries-list");
+          entriesList.innerHTML = ""; // Clear previous list
+          entries.forEach((entry) => {
+            const listItem = document.createElement("li");
+            listItem.textContent = `${entry.entry} (Timestamp: ${new Date(
+              entry.timestamp * 1000
+            ).toLocaleString()})`;
+            entriesList.appendChild(listItem);
+          });
+        } catch (error) {
+          console.error(error);
+          alert("Error retrieving entries");
+        }
+      }
+    </script>
+  </body>
+</html>
